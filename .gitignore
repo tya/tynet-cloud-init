@@ -1,0 +1,6 @@
+# compiled binary
+/serve-cloud-init
+
+# runtime seed data — rendered onto the kickstart host by tynet-infra Ansible.
+# Test fixtures are in testdata/cloud-init/.
+/cloud-init/
