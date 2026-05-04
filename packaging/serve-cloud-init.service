@@ -1,0 +1,16 @@
+[Unit]
+Description=cloud-init seed data HTTP server
+Documentation=https://github.com/tya/tynet-cloud-init
+After=network.target
+
+[Service]
+Type=simple
+User=serve-cloud-init
+Group=serve-cloud-init
+EnvironmentFile=-/etc/default/serve-cloud-init
+ExecStart=/usr/bin/serve-cloud-init $OPTIONS
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

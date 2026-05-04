@@ -1,0 +1,31 @@
+name: serve-cloud-init
+arch: arm64
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: Ty Alexander <ty.alexander@gmail.com>
+description: |
+  NoCloud cloud-init seed data HTTP server for tynet Pi netboot.
+  Serves per-node cloud-init metadata over HTTP to Raspberry Pis
+  during NFS netboot.
+homepage: https://github.com/tya/tynet-cloud-init
+license: Proprietary
+contents:
+  - src: ./serve-cloud-init
+    dst: /usr/bin/serve-cloud-init
+    file_info:
+      mode: 0755
+  - src: ./packaging/serve-cloud-init.service
+    dst: /lib/systemd/system/serve-cloud-init.service
+    file_info:
+      mode: 0644
+  - src: ./packaging/serve-cloud-init.default
+    dst: /etc/default/serve-cloud-init
+    type: config|noreplace
+    file_info:
+      mode: 0644
+scripts:
+  postinstall: ./packaging/postinst.sh
+  preremove: ./packaging/prerm.sh
+  postremove: ./packaging/postrm.sh
