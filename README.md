@@ -15,21 +15,61 @@ ds=nocloud;s=http://<kickstart_ip>:8000/<serial>/
 ```sh
 make build         # local
 make build-linux   # cross-compile for kickstart host (linux/arm64)
+make deb           # build linux/arm64 .deb into dist/ (requires nfpm)
 make test          # uses testdata/cloud-init/
+```
+
+`nfpm` is the only extra build dep (single static Go binary, no runtime deps):
+
+```sh
+# macOS
+brew install goreleaser/tap/nfpm
+
+# Debian/Ubuntu (goreleaser apt repo)
+echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+sudo apt update && sudo apt install nfpm
+
+# Any Linux (pinned tarball — matches CI)
+NFPM_VERSION=2.46.3
+curl -sSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
+  | sudo tar -xz -C /usr/local/bin nfpm
+
+# Or via Go (you already have it for this repo)
+go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
 ```
 
 ## Per-node seed data
 
-Seed files live in `cloud-init/<serial>/` at runtime — **rendered by
+Seed files live in `<dir>/<serial>/` at runtime — **rendered by
 [tynet-infra](https://github.com/tya/tynet-infra) Ansible** from
-inventory and `keys/*.pub`. The directory is gitignored here; fixtures
-used by `go test` are in `testdata/cloud-init/`.
+inventory and `keys/*.pub`. Fixtures used by `go test` are in
+`testdata/cloud-init/`.
+
+## Releasing
+
+Tag with semver and push:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` runs on tag push, builds the arm64 `.deb`,
+and publishes it to a GitHub Release. The kickstart host pulls the .deb
+from there into its local apt mirror.
 
 ## Deployment
 
-Managed as a systemd service by the kickstart Ansible role in tynet-infra.
-The service runs `serve-cloud-init -dir <cloud_init_dir>` on
-`kickstart.tynet.us:8000`.
+Distributed as a Debian package (`serve-cloud-init`) installed via apt by
+the kickstart Ansible role in [tynet-infra](https://github.com/tya/tynet-infra).
+The package ships a systemd unit that runs as the `serve-cloud-init` system
+user and reads runtime options from `/etc/default/serve-cloud-init`:
+
+```
+OPTIONS="-dir /var/lib/serve-cloud-init -addr :8000"
+```
+
+Ansible templates that file to point `-dir` at the rendered seed-data tree.
 
 ## Related
 
