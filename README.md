@@ -77,13 +77,23 @@ OPTIONS="-dir /var/lib/serve-cloud-init -addr :8000"
 Ansible templates that file to point `-dir` at the rendered seed-data tree.
 
 The .deb also installs `/usr/bin/serve-cloud-init-probe`, a small POSIX
-shell tool that fetches all four cloud-init files for a given key and
-prints them with section headers — useful for verifying a node's seed
-data is being served correctly without booting the node:
+shell tool that fetches all four cloud-init files for a given key —
+useful for verifying a node's seed data is being served correctly
+without booting the node:
 
 ```sh
 serve-cloud-init-probe dc-a6-32-8d-f3-ca                             # default: localhost:8000
 serve-cloud-init-probe dc-a6-32-8d-f3-ca kickstart.tynet.us:8000     # explicit host
+```
+
+Pass `--check` for a smoke-test mode that asserts each response is
+present and contains the same substrings the Go server's tests check
+for (`#cloud-config`, `instance-id:`, `ssh-ed25519 `, etc.). Prints
+`ok: <key> via <host>` and exits 0 on success; prints per-failure
+diagnostics to stderr and exits 1 on any miss:
+
+```sh
+serve-cloud-init-probe --check dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
 ```
 
 ## Related
