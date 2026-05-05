@@ -16,6 +16,10 @@ contents:
     dst: /usr/bin/serve-cloud-init
     file_info:
       mode: 0755
+  - src: ./packaging/serve-cloud-init-probe.sh
+    dst: /usr/bin/serve-cloud-init-probe
+    file_info:
+      mode: 0755
   - src: ./packaging/serve-cloud-init.service
     dst: /lib/systemd/system/serve-cloud-init.service
     file_info:
