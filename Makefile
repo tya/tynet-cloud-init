@@ -25,6 +25,16 @@ build-linux:
 deb: build-linux
 	@command -v nfpm >/dev/null || { echo "install nfpm: https://nfpm.goreleaser.com/install/"; exit 1; }
 	mkdir -p dist
+	# Generate a minimal Debian changelog at build time, gzipped to satisfy
+	# lintian's `no-changelog` requirement for native packages. Keeps the
+	# version pinned to whatever nfpm is about to package.
+	{ \
+	  echo "$(BINARY) ($(VERSION)) stable; urgency=low"; \
+	  echo ""; \
+	  echo "  * See https://github.com/tya/tynet-cloud-init/releases/tag/v$(VERSION) for details."; \
+	  echo ""; \
+	  echo " -- Ty Alexander <ty.alexander@gmail.com>  $$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')"; \
+	} | gzip -9 -n > dist/changelog.gz
 	VERSION=$(VERSION) nfpm package -f packaging/nfpm.yaml -p deb -t dist/
 
 test:
