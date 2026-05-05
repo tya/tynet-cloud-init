@@ -16,3 +16,35 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test -v .
+
+  deb-lint:
+    name: Build .deb and lintian-check
+    runs-on: ubuntu-latest
+    env:
+      NFPM_VERSION: 2.46.3
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install nfpm + lintian
+        run: |
+          curl -sSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin nfpm
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lintian
+          nfpm --version
+          lintian --version
+
+      - name: Build .deb
+        run: make deb VERSION=0.0.0~ci
+
+      # Run lintian for awareness on every PR. Don't fail the build yet —
+      # nfpm-built .debs trigger a lot of stylistic tags (no copyright file,
+      # no debian/changelog, missing manpages, etc.) that we'd need to fix
+      # individually. Tighten the gate (e.g. --fail-on error) after the
+      # known-noisy tags are addressed.
+      - name: Lintian
+        run: lintian --info --display-info --color always dist/*.deb || true
