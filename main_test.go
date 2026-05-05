@@ -36,6 +36,9 @@ func TestServeCloudInit(t *testing.T) {
 
 		// unknown MAC → 404
 		{name: "unknown mac", path: "/00-00-00-00-00-00/meta-data", wantCode: http.StatusNotFound},
+
+		// healthcheck: 200 + "ok" when dir is present
+		{name: "healthcheck ok", path: "/healthcheck", wantCode: http.StatusOK, wantBody: "ok"},
 	}
 
 	for _, tt := range tests {
@@ -60,5 +63,20 @@ func TestServeCloudInit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHealthcheckMissingDir(t *testing.T) {
+	server := httptest.NewServer(newHandler("/nonexistent/cloud-init"))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/healthcheck")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("got status %d, want %d", resp.StatusCode, http.StatusServiceUnavailable)
 	}
 }

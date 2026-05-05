@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +14,14 @@ func newHandler(dir string) http.Handler {
 	fs := http.FileServer(http.Dir(dir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL.Path)
+		if r.URL.Path == "/healthcheck" {
+			if _, err := os.Stat(dir); err != nil {
+				http.Error(w, fmt.Sprintf("unhealthy: %v", err), http.StatusServiceUnavailable)
+				return
+			}
+			io.WriteString(w, "ok\n")
+			return
+		}
 		fs.ServeHTTP(w, r)
 	})
 }
