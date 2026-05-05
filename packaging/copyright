@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: serve-cloud-init
+Source: https://github.com/tya/tynet-cloud-init
+
+Files: *
+Copyright: 2026 Ty Alexander <ty.alexander@gmail.com>
+License: Proprietary
+ All rights reserved. This software is provided for internal use only.
