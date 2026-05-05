@@ -10,6 +10,11 @@ seed data via `cmdline.txt`:
 ds=nocloud;s=http://<kickstart_ip>:8000/<serial>/
 ```
 
+Also exposes `GET /healthz`: returns `200 OK` (`ok\n`) when `-dir` is
+statable, `503 Service Unavailable` when the directory is missing or
+unreadable. The path `/healthz` is reserved — a node serial of literally
+`healthz` would shadow this endpoint.
+
 ## Build & test
 
 ```sh
