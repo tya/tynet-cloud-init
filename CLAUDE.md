@@ -13,11 +13,11 @@ ds=nocloud;s=http://<kickstart_ip>:8000/<serial>/
 ```
 
 The server is a thin wrapper around `http.FileServer` that adds request logging
-and a `/healthz` endpoint. It serves
+and a `/healthcheck` endpoint. It serves
 `<dir>/<serial>/{meta-data,user-data,network-config,vendor-data}`, where
-`<serial>` is the Pi's CPU serial. Unknown serials → 404. `GET /healthz`
-returns `200 OK` when `-dir` is statable and `503` otherwise — `/healthz` is
-reserved (a node with serial `healthz` would shadow it).
+`<serial>` is the Pi's CPU serial. Unknown serials → 404. `GET /healthcheck`
+returns `200 OK` when `-dir` is statable and `503` otherwise — `/healthcheck`
+is reserved (a node with serial `healthcheck` would shadow it).
 
 ## Common commands
 
