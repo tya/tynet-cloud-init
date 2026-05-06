@@ -60,8 +60,13 @@ git push origin v0.1.0
 ```
 
 `.github/workflows/release.yml` runs on tag push, builds the arm64 `.deb`,
-and publishes it to a GitHub Release. The kickstart host pulls the .deb
-from there into its local apt mirror.
+and publishes it to a GitHub Release. From there it's automatic:
+[tynet-github-puller](https://github.com/tya/tynet-github-puller) runs as a
+60-second systemd timer on the kickstart host, sees the new release within
+a minute, and imports it into the local apt mirror via `aptly repo add` +
+`aptly publish update`. To actually upgrade the running service, bump the
+version pin in `tynet-infra/roles/kickstart/defaults/main.yml` and re-run
+`make kickstart`.
 
 ## Deployment
 
