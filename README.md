@@ -2,18 +2,21 @@
 
 HTTP server for per-node cloud-init seed data on tynet.us infrastructure.
 
-Serves files from `<dir>/<serial>/{meta-data,user-data,network-config,vendor-data}`,
-keyed by Pi serial number. Pi nodes booting via NFS netboot fetch their
+Serves files from `<dir>/<key>/{meta-data,user-data,network-config,vendor-data}`,
+where `<key>` is whatever path segment names a Pi's seed directory. In
+production it's the node's MAC (e.g. `dc-a6-32-8d-f3-ca`); historically
+it was the CPU serial. The server doesn't care — anything matching a
+directory under `-dir` works. Pi nodes booting via NFS netboot fetch their
 seed data via `cmdline.txt`:
 
 ```
-ds=nocloud;s=http://<kickstart_ip>:8000/<serial>/
+ds=nocloud;s=http://<kickstart_ip>:8000/<key>/
 ```
 
 Also exposes `GET /healthcheck`: returns `200 OK` (`ok\n`) when `-dir` is
 statable, `503 Service Unavailable` when the directory is missing or
-unreadable. The path `/healthcheck` is reserved — a node key (MAC or
-serial) of literally `healthcheck` would shadow this endpoint.
+unreadable. The path `/healthcheck` is reserved — a node keyed literally
+`healthcheck` would shadow this endpoint.
 
 ## Build & test
 
@@ -45,10 +48,11 @@ go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
 
 ## Per-node seed data
 
-Seed files live in `<dir>/<serial>/` at runtime — **rendered by
+Seed files live in `<dir>/<key>/` at runtime — **rendered by
 [tynet-infra](https://github.com/tya/tynet-infra) Ansible** from
 inventory and `keys/*.pub`. Fixtures used by `go test` are in
-`testdata/cloud-init/`.
+`testdata/cloud-init/` (currently MAC-keyed: `dc-a6-32-8d-f3-ca`,
+`dc-a6-32-80-2a-cc`, `52-55-55-60-97-49`).
 
 ## Releasing
 
