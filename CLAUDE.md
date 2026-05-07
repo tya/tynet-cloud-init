@@ -9,15 +9,17 @@ cloud-init NoCloud seed data to Raspberry Pi nodes during NFS netboot. Pis fetch
 their seed via `cmdline.txt`:
 
 ```
-ds=nocloud;s=http://<kickstart_ip>:8000/<serial>/
+ds=nocloud;s=http://<kickstart_ip>:8000/<key>/
 ```
 
-The server is a thin wrapper around `http.FileServer` that adds request logging
-and a `/healthcheck` endpoint. It serves
-`<dir>/<serial>/{meta-data,user-data,network-config,vendor-data}`, where
-`<serial>` is the Pi's CPU serial. Unknown serials → 404. `GET /healthcheck`
-returns `200 OK` when `-dir` is statable and `503` otherwise — `/healthcheck`
-is reserved (a node with serial `healthcheck` would shadow it).
+The `<key>` is an opaque path segment matching a directory under `-dir`. In
+production it's the node's MAC (e.g. `dc-a6-32-8d-f3-ca`); historically it was
+the CPU serial. The server doesn't care — it's a thin wrapper around
+`http.FileServer` that adds request logging and a `/healthcheck` endpoint. It
+serves `<dir>/<key>/{meta-data,user-data,network-config,vendor-data}`. Unknown
+keys → 404. `GET /healthcheck` returns `200 OK` when `-dir` is statable and
+`503` otherwise — `/healthcheck` is reserved (a node keyed literally
+`healthcheck` would shadow it).
 
 ## Common commands
 
@@ -42,25 +44,42 @@ Module path is `github.com/tya/tynet-cloud-init`, Go 1.22, no third-party deps.
 
 ## Architecture and the broader system
 
-This service is one of three coordinated repos. **Don't make changes here in
+This service is one of four coordinated repos. **Don't make changes here in
 isolation when behavior is shared across them:**
 
 - **tynet-cloud-init** (this repo) — serves seed data over HTTP at boot time.
   Distributed as a `.deb` published to GitHub Releases on tag push.
-- **tynet-infra** — Ansible source of truth. Renders the runtime
-  `<serial>/` seed tree on the kickstart host from inventory + `keys/*.pub`,
-  installs `serve-cloud-init` via `apt` from a self-hosted aptly repo on
-  `kickstart.tynet.us` (mirrored from GitHub Releases), and configures the
-  service via `/etc/default/serve-cloud-init`.
+- **tynet-github-puller** — runs on `kickstart.tynet.us`. Polls this repo's
+  `releases/latest` every ~60s with ETag caching; on a new tag, downloads the
+  `.deb` and imports it into the local aptly mirror. Also ships
+  **`tynet-deb-installer`**, a companion that runs `apt-get install` against
+  the local mirror's candidate, then runs a per-package healthcheck and
+  auto-rolls-back on failure (the `serve-cloud-init` healthcheck is `GET
+  /healthcheck`).
+- **tynet-infra** — Ansible source of truth. Renders the runtime `<key>/`
+  seed tree on kickstart from inventory + `keys/*.pub`, hosts the local
+  aptly mirror (`apt-mirror` role), templates the puller's watch list and
+  the deb-installer's managed-package list. Configures the service via
+  `/etc/default/serve-cloud-init`.
 - **tynet-img** — builds the Pi netboot image and provisions per-node TFTP
   (including the `cmdline.txt` that points here).
 
+**Release flow is fully autonomous for the steady state.** `git push origin
+v0.X.Y` → release workflow publishes the `.deb` → puller imports it within
+~60s → deb-installer auto-upgrades with healthcheck → rollback on failure.
+No manual `make import-cloud-init-release` or pin bumps. Be aware of this
+when shipping a release: a healthy tag goes live within ~2 minutes; an
+unhealthy one rolls back automatically and the broken `.deb` stays in the
+local mirror until pruned (`aptly repo remove tynet 'serve-cloud-init (=
+<bad-version>)'`).
+
 The runtime `cloud-init/` directory is **gitignored** — it only exists on the
 kickstart host, populated by tynet-infra Ansible. Test fixtures live in
-`testdata/cloud-init/` (serials `244634d3`, `a43386be`, plus `testnode`) and are
-the only seed data this repo owns. If you change the on-disk layout (filenames,
-directory shape, response semantics), the corresponding Ansible templates in
-tynet-infra must be updated too.
+`testdata/cloud-init/` keyed by MAC (e.g. `dc-a6-32-8d-f3-ca`,
+`dc-a6-32-80-2a-cc`, `52-55-55-60-97-49`) — see the directory for the
+current set. They're the only seed data this repo owns. If you change the
+on-disk layout (filenames, directory shape, response semantics), the
+corresponding Ansible templates in tynet-infra must be updated too.
 
 ## Conventions worth knowing
 
