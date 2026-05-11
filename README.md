@@ -64,13 +64,16 @@ git push origin v0.1.0
 ```
 
 `.github/workflows/release.yml` runs on tag push, builds the arm64 `.deb`,
-and publishes it to a GitHub Release. From there it's automatic:
-[tynet-github-puller](https://github.com/tya/tynet-github-puller) runs as a
-60-second systemd timer on the kickstart host, sees the new release within
-a minute, and imports it into the local apt mirror via `aptly repo add` +
-`aptly publish update`. To actually upgrade the running service, bump the
-version pin in `tynet-infra/roles/kickstart/defaults/main.yml` and re-run
-`make kickstart`.
+publishes it to a GitHub Release, and dispatches `new-release` into
+[tya/tynet-apt](https://github.com/tya/tynet-apt). That repo's `ingest`
+workflow drops the deb into its pool, regenerates the signed apt indexes,
+and pushes to `gh-pages` — the GH-Pages-served apt repo at
+`https://tya.github.io/tynet-apt`. On kickstart,
+[tynet-deb-installer](https://github.com/tya/tynet-github-puller) runs on a
+60-second systemd timer, sees the new candidate, `apt-get install`s it, and
+runs the `/healthcheck` URL probe (auto-rolls-back on failure). End-to-end:
+healthy tag goes live within ~2 minutes; nothing on the kickstart side
+needs a manual bump.
 
 ## Deployment
 
