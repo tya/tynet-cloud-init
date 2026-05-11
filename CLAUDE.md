@@ -44,7 +44,7 @@ Module path is `github.com/tya/tynet-cloud-init`, Go 1.22, no third-party deps.
 
 ## Architecture and the broader system
 
-This service is one of four coordinated repos. **Don't make changes here in
+This service is one of three coordinated repos. **Don't make changes here in
 isolation when behavior is shared across them:**
 
 - **tynet-cloud-init** (this repo) — serves seed data over HTTP at boot time.
@@ -54,15 +54,11 @@ isolation when behavior is shared across them:**
   `repository_dispatch` (fired by this repo's release workflow), drops the
   `.deb` into the pool, regenerates signed apt indexes, and pushes
   `gh-pages`.
-- **tynet-deb-installer** (shipped from `tya/tynet-github-puller`) — runs on
-  `kickstart.tynet.us` via a 60s systemd timer. `apt-get install`s the
-  current candidate of each managed package, then runs a per-package
-  healthcheck and auto-rolls-back on failure (`serve-cloud-init`'s
-  healthcheck is `GET /healthcheck`).
 - **tynet-infra** — Ansible source of truth. Renders the runtime `<key>/`
   seed tree on kickstart from inventory + `keys/*.pub`, configures the apt
-  source pointing at `tya.github.io/tynet-apt`, templates the
-  deb-installer's managed-package list. Configures the service via
+  source pointing at `tya.github.io/tynet-apt`, and configures Ubuntu's
+  native `unattended-upgrades` (scoped to `origin=tynet`, hourly cadence)
+  to install/upgrade tynet packages. Configures the service via
   `/etc/default/serve-cloud-init`.
 - **tynet-img** — builds the Pi netboot image and provisions per-node TFTP
   (including the `cmdline.txt` that points here).
@@ -70,13 +66,14 @@ isolation when behavior is shared across them:**
 **Release flow is fully autonomous for the steady state.** `git push origin
 v0.X.Y` → release workflow publishes the `.deb` and dispatches into
 `tya/tynet-apt` → ingest regenerates the GH-Pages apt repo within ~30s →
-deb-installer auto-upgrades on its next tick (~60s) with healthcheck →
-rollback on failure. No manual `make import-cloud-init-release` or pin
-bumps. Be aware of this when shipping a release: a healthy tag goes live
-within ~2 minutes; an unhealthy one rolls back automatically and the broken
-`.deb` stays in the apt pool until pruned (drop the file from `pool/main/s/
-serve-cloud-init/` on `tya/tynet-apt`'s `gh-pages` branch and re-run the
-ingest workflow to rebuild indexes).
+on kickstart, `apt-daily-upgrade.timer` fires within ≤1h, `unattended-upgrade`
+picks up the new candidate, `apt-get install`s it. No manual
+`make import-cloud-init-release` or pin bumps; total wall-clock from tag to
+upgraded service is ≤1 hour. If a release ships a broken binary, the operator
+notices via service monitoring (no auto-rollback); fix is to prune the bad
+.deb from `pool/main/s/serve-cloud-init/` on `tya/tynet-apt`'s `gh-pages`
+branch and re-run the ingest workflow to rebuild indexes, then publish a
+follow-up release.
 
 The runtime `cloud-init/` directory is **gitignored** — it only exists on the
 kickstart host, populated by tynet-infra Ansible. Test fixtures live in
