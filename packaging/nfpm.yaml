@@ -1,4 +1,4 @@
-name: serve-cloud-init
+name: tynet-cloud-init
 arch: arm64
 platform: linux
 version: ${VERSION}
@@ -11,34 +11,45 @@ description: |
   during NFS netboot.
 homepage: https://github.com/tya/tynet-cloud-init
 license: Proprietary
+# Transitional metadata for renaming away from the legacy `serve-cloud-init`
+# package. `replaces` + `conflicts` make apt remove the old package as it
+# installs this one; `provides` lets anything still pinning the old name
+# resolve. Safe to drop in a future major bump once nothing references the
+# old name.
+replaces:
+  - serve-cloud-init
+conflicts:
+  - serve-cloud-init
+provides:
+  - serve-cloud-init
 contents:
-  - src: ./serve-cloud-init
-    dst: /usr/bin/serve-cloud-init
+  - src: ./tynet-cloud-init
+    dst: /usr/bin/tynet-cloud-init
     file_info:
       mode: 0755
-  - src: ./packaging/serve-cloud-init-probe.sh
-    dst: /usr/bin/serve-cloud-init-probe
+  - src: ./packaging/tynet-cloud-init-probe.sh
+    dst: /usr/bin/tynet-cloud-init-probe
     file_info:
       mode: 0755
-  - src: ./packaging/serve-cloud-init.service
-    dst: /lib/systemd/system/serve-cloud-init.service
+  - src: ./packaging/tynet-cloud-init.service
+    dst: /lib/systemd/system/tynet-cloud-init.service
     file_info:
       mode: 0644
-  - src: ./packaging/serve-cloud-init.default
-    dst: /etc/default/serve-cloud-init
+  - src: ./packaging/tynet-cloud-init.default
+    dst: /etc/default/tynet-cloud-init
     type: config|noreplace
     file_info:
       mode: 0644
   - src: ./packaging/copyright
-    dst: /usr/share/doc/serve-cloud-init/copyright
+    dst: /usr/share/doc/tynet-cloud-init/copyright
     file_info:
       mode: 0644
   - src: ./dist/changelog.gz
-    dst: /usr/share/doc/serve-cloud-init/changelog.gz
+    dst: /usr/share/doc/tynet-cloud-init/changelog.gz
     file_info:
       mode: 0644
   - src: ./packaging/lintian-overrides
-    dst: /usr/share/lintian/overrides/serve-cloud-init
+    dst: /usr/share/lintian/overrides/tynet-cloud-init
     file_info:
       mode: 0644
 scripts:

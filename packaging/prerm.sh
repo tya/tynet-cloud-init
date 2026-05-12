@@ -2,6 +2,6 @@
 set -e
 
 if [ -d /run/systemd/system ]; then
-    systemctl stop serve-cloud-init.service || true
-    systemctl disable serve-cloud-init.service || true
+    systemctl stop tynet-cloud-init.service || true
+    systemctl disable tynet-cloud-init.service || true
 fi

@@ -5,10 +5,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=serve-cloud-init
-Group=serve-cloud-init
-EnvironmentFile=-/etc/default/serve-cloud-init
-ExecStart=/usr/bin/serve-cloud-init $OPTIONS
+User=tynet-cloud-init
+Group=tynet-cloud-init
+EnvironmentFile=-/etc/default/tynet-cloud-init
+ExecStart=/usr/bin/tynet-cloud-init $OPTIONS
 Restart=always
 RestartSec=5
 

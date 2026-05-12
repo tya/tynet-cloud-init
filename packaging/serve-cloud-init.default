@@ -1,4 +1,0 @@
-# Options passed to serve-cloud-init.
-# -dir: directory containing per-serial cloud-init seed data
-# -addr: listen address
-OPTIONS="-dir /var/lib/serve-cloud-init -addr :8000"

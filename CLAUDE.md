@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A tiny single-binary Go HTTP server (`serve-cloud-init`) that hands out per-node
+A tiny single-binary Go HTTP server (`tynet-cloud-init`) that hands out per-node
 cloud-init NoCloud seed data to Raspberry Pi nodes during NFS netboot. Pis fetch
 their seed via `cmdline.txt`:
 
@@ -59,7 +59,7 @@ isolation when behavior is shared across them:**
   source pointing at `tya.github.io/tynet-apt`, and configures Ubuntu's
   native `unattended-upgrades` (scoped to `origin=tynet`, hourly cadence)
   to install/upgrade tynet packages. Configures the service via
-  `/etc/default/serve-cloud-init`.
+  `/etc/default/tynet-cloud-init`.
 - **tynet-img** — builds the Pi netboot image and provisions per-node TFTP
   (including the `cmdline.txt` that points here).
 
@@ -71,7 +71,7 @@ picks up the new candidate, `apt-get install`s it. No manual
 `make import-cloud-init-release` or pin bumps; total wall-clock from tag to
 upgraded service is ≤1 hour. If a release ships a broken binary, the operator
 notices via service monitoring (no auto-rollback); fix is to prune the bad
-.deb from `pool/main/s/serve-cloud-init/` on `tya/tynet-apt`'s `gh-pages`
+.deb from `pool/main/t/tynet-cloud-init/` on `tya/tynet-apt`'s `gh-pages`
 branch and re-run the ingest workflow to rebuild indexes, then publish a
 follow-up release.
 
@@ -87,7 +87,7 @@ corresponding Ansible templates in tynet-infra must be updated too.
 
 - `defaultDir()` resolves to `<exe_dir>/cloud-init`, not CWD — convenient for
   development. The shipped systemd unit passes `-dir` explicitly via
-  `/etc/default/serve-cloud-init`, so this fallback isn't relied on in production.
+  `/etc/default/tynet-cloud-init`, so this fallback isn't relied on in production.
 - The handler logs every request (`remoteAddr method path`); preserve this when
   refactoring — it's the only operational visibility into Pi boot attempts.
 - Tests assert on **substring presence** in response bodies (`#cloud-config`,
@@ -100,14 +100,14 @@ corresponding Ansible templates in tynet-infra must be updated too.
 
 - `nfpm.yaml` — package definition (arm64, contents map, scripts). `${VERSION}`
   is interpolated by nfpm from the env var the Makefile sets.
-- `serve-cloud-init.service` — systemd unit. Runs as a dedicated
-  `serve-cloud-init` system user, sources `OPTIONS` from
-  `/etc/default/serve-cloud-init`. Generic — no host-specific values.
-- `serve-cloud-init.default` — the `OPTIONS` env file. Marked `config|noreplace`
+- `tynet-cloud-init.service` — systemd unit. Runs as a dedicated
+  `tynet-cloud-init` system user, sources `OPTIONS` from
+  `/etc/default/tynet-cloud-init`. Generic — no host-specific values.
+- `tynet-cloud-init.default` — the `OPTIONS` env file. Marked `config|noreplace`
   in nfpm.yaml so Ansible-managed edits survive `apt upgrade`.
 - `postinst.sh` / `prerm.sh` / `postrm.sh` — create the system user, manage
   systemd enable/start/stop. Must be POSIX `sh`, not bash.
 
 If you change file paths, the systemd unit, or the user/group, audit the
-tynet-infra `kickstart` role at the same time — its `/etc/default/serve-cloud-init`
+tynet-infra `kickstart` role at the same time — its `/etc/default/tynet-cloud-init`
 template and seed-data dir permissions assume these conventions.

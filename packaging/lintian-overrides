@@ -1,13 +1,13 @@
 # Go binaries are statically linked by design — no system .so deps,
 # trivially deployable, no runtime libc surprises. Intentional.
-serve-cloud-init: statically-linked-binary [usr/bin/serve-cloud-init]
+tynet-cloud-init: statically-linked-binary [usr/bin/tynet-cloud-init]
 
 # Keeping debug symbols for stack traces. The binary is small (~7.5 MB)
 # so the size cost is negligible.
-serve-cloud-init: unstripped-binary-or-object [usr/bin/serve-cloud-init]
+tynet-cloud-init: unstripped-binary-or-object [usr/bin/tynet-cloud-init]
 
 # We invoke `systemctl` directly in postinst/prerm rather than going
 # through deb-systemd-helper / invoke-rc.d. This package targets only
 # systemd-based hosts (kickstart.tynet.us, internal infra) so the
 # fallback machinery isn't load-bearing.
-serve-cloud-init: maintainer-script-calls-systemctl
+tynet-cloud-init: maintainer-script-calls-systemctl

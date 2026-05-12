@@ -1,17 +1,17 @@
 #!/bin/sh
 set -e
 
-if ! getent passwd serve-cloud-init >/dev/null; then
+if ! getent passwd tynet-cloud-init >/dev/null; then
     adduser --system --group --no-create-home \
-        --home /var/lib/serve-cloud-init \
+        --home /var/lib/tynet-cloud-init \
         --shell /usr/sbin/nologin \
-        serve-cloud-init
+        tynet-cloud-init
 fi
 
-install -d -o serve-cloud-init -g serve-cloud-init -m 0755 /var/lib/serve-cloud-init
+install -d -o tynet-cloud-init -g tynet-cloud-init -m 0755 /var/lib/tynet-cloud-init
 
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload
-    systemctl enable serve-cloud-init.service
-    systemctl restart serve-cloud-init.service || true
+    systemctl enable tynet-cloud-init.service
+    systemctl restart tynet-cloud-init.service || true
 fi
