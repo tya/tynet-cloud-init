@@ -39,6 +39,8 @@ func main() {
 	addr := flag.String("addr", ":8000", "address to listen on")
 	flag.Parse()
 
+	// journald already timestamps each line; drop Go's prefix to avoid duplicates.
+	log.SetFlags(0)
 	log.Printf("serving %s on %s", *dir, *addr)
 	log.Fatal(http.ListenAndServe(*addr, newHandler(*dir)))
 }
