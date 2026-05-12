@@ -1,0 +1,4 @@
+# Options passed to tynet-cloud-init.
+# -dir: directory containing per-node cloud-init seed data
+# -addr: listen address
+OPTIONS="-dir /var/lib/tynet-cloud-init -addr :8000"

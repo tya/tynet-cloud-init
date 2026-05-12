@@ -1,16 +1,16 @@
 #!/bin/sh
-# serve-cloud-init-probe — fetch a node's cloud-init seed data over HTTP
-# from a serve-cloud-init server. Useful for verifying that the per-node
+# tynet-cloud-init-probe — fetch a node's cloud-init seed data over HTTP
+# from a tynet-cloud-init server. Useful for verifying that the per-node
 # tree under -dir is being served correctly without booting the node.
 
 set -eu
 
 usage() {
     cat <<EOF
-Usage: serve-cloud-init-probe [--check] <mac-or-serial> [host[:port]]
+Usage: tynet-cloud-init-probe [--check] <mac-or-serial> [host[:port]]
 
 Fetches /<key>/{meta-data,user-data,network-config,vendor-data} from the
-serve-cloud-init HTTP server. Default host is localhost:8000; pass a
+tynet-cloud-init HTTP server. Default host is localhost:8000; pass a
 hostname or full URL to probe a different server.
 
 Without --check, prints each response separated by section headers.
@@ -18,9 +18,9 @@ With --check, runs substring assertions on each response and exits
 non-zero if any are missing — suitable for scripts and post-deploy
 smoke tests. The required substrings mirror the Go server's tests.
 
-  serve-cloud-init-probe dc-a6-32-8d-f3-ca
-  serve-cloud-init-probe dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
-  serve-cloud-init-probe --check dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
+  tynet-cloud-init-probe dc-a6-32-8d-f3-ca
+  tynet-cloud-init-probe dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
+  tynet-cloud-init-probe --check dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
 EOF
 }
 

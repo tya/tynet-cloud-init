@@ -1,4 +1,4 @@
-BINARY = serve-cloud-init
+BINARY = tynet-cloud-init
 # Convert hyphens to tildes so git-describe output (e.g. v0.1.0-3-gabc-dirty)
 # is a valid Debian version. Fall back to 0.0.0~dev when no tag exists yet.
 GIT_VERSION := $(shell git describe --tags --dirty 2>/dev/null | sed -e 's/^v//' -e 's/-/~/g')

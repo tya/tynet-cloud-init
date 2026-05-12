@@ -44,5 +44,5 @@ jobs:
             -f event_type=new-release \
             -F client_payload[repo]="${{ github.repository }}" \
             -F client_payload[tag]="$VERSION" \
-            -F client_payload[package]=serve-cloud-init \
-            -F client_payload[asset_url]="https://github.com/${{ github.repository }}/releases/download/${VERSION}/serve-cloud-init_${VER}_arm64.deb"
+            -F client_payload[package]=tynet-cloud-init \
+            -F client_payload[asset_url]="https://github.com/${{ github.repository }}/releases/download/${VERSION}/tynet-cloud-init_${VER}_arm64.deb"

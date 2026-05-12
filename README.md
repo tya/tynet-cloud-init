@@ -76,25 +76,25 @@ a manual bump.
 
 ## Deployment
 
-Distributed as a Debian package (`serve-cloud-init`) installed via apt by
+Distributed as a Debian package (`tynet-cloud-init`) installed via apt by
 the kickstart Ansible role in [tynet-infra](https://github.com/tya/tynet-infra).
-The package ships a systemd unit that runs as the `serve-cloud-init` system
-user and reads runtime options from `/etc/default/serve-cloud-init`:
+The package ships a systemd unit that runs as the `tynet-cloud-init` system
+user and reads runtime options from `/etc/default/tynet-cloud-init`:
 
 ```
-OPTIONS="-dir /var/lib/serve-cloud-init -addr :8000"
+OPTIONS="-dir /var/lib/tynet-cloud-init -addr :8000"
 ```
 
 Ansible templates that file to point `-dir` at the rendered seed-data tree.
 
-The .deb also installs `/usr/bin/serve-cloud-init-probe`, a small POSIX
+The .deb also installs `/usr/bin/tynet-cloud-init-probe`, a small POSIX
 shell tool that fetches all four cloud-init files for a given key —
 useful for verifying a node's seed data is being served correctly
 without booting the node:
 
 ```sh
-serve-cloud-init-probe dc-a6-32-8d-f3-ca                             # default: localhost:8000
-serve-cloud-init-probe dc-a6-32-8d-f3-ca kickstart.tynet.us:8000     # explicit host
+tynet-cloud-init-probe dc-a6-32-8d-f3-ca                             # default: localhost:8000
+tynet-cloud-init-probe dc-a6-32-8d-f3-ca kickstart.tynet.us:8000     # explicit host
 ```
 
 Pass `--check` for a smoke-test mode that asserts each response is
@@ -104,7 +104,7 @@ for (`#cloud-config`, `instance-id:`, `ssh-ed25519 `, etc.). Prints
 diagnostics to stderr and exits 1 on any miss:
 
 ```sh
-serve-cloud-init-probe --check dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
+tynet-cloud-init-probe --check dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
 ```
 
 ## Related
