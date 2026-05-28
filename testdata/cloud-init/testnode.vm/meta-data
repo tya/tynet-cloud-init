@@ -1,2 +1,2 @@
-instance-id: testnode
+instance-id: testnode.vm
 local-hostname: testnode.vm

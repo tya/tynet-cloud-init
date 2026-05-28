@@ -24,7 +24,7 @@ func newTestServer(t *testing.T, lookup func(string) ([]string, error)) *httptes
 
 func TestServeCloudInit(t *testing.T) {
 	nodes := []struct {
-		hostname string // FQDN returned by PTR; first label must match a testdata dir
+		hostname string // FQDN returned by PTR; must match a testdata dir
 	}{
 		{"pi2.tynet.us"},
 		{"pi3.tynet.us"},
@@ -68,7 +68,7 @@ func TestUnknownHostname(t *testing.T) {
 func TestNodeOverrideRoute(t *testing.T) {
 	// Stub returns a name with no matching dir; /node/ must bypass the lookup.
 	server := newTestServer(t, stubLookup("nosuchhost.example"))
-	assertGet(t, server.URL+"/node/pi2/meta-data", http.StatusOK, "local-hostname:")
+	assertGet(t, server.URL+"/node/pi2.tynet.us/meta-data", http.StatusOK, "local-hostname:")
 }
 
 func TestHealthcheckOK(t *testing.T) {

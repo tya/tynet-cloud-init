@@ -7,9 +7,9 @@ set -eu
 
 usage() {
     cat <<EOF
-Usage: tynet-cloud-init-probe [--check] <hostname> [host[:port]]
+Usage: tynet-cloud-init-probe [--check] <fqdn> [host[:port]]
 
-Fetches /node/<hostname>/{meta-data,user-data,network-config,vendor-data}
+Fetches /node/<fqdn>/{meta-data,user-data,network-config,vendor-data}
 from the tynet-cloud-init HTTP server. Default host is localhost:8000;
 pass a hostname or full URL to probe a different server.
 
@@ -22,9 +22,9 @@ With --check, runs substring assertions on each response and exits
 non-zero if any are missing — suitable for scripts and post-deploy
 smoke tests. The required substrings mirror the Go server's tests.
 
-  tynet-cloud-init-probe pi2
-  tynet-cloud-init-probe pi2 kickstart.tynet.us:8000
-  tynet-cloud-init-probe --check pi2 kickstart.tynet.us:8000
+  tynet-cloud-init-probe pi2.tynet.us
+  tynet-cloud-init-probe pi2.tynet.us kickstart.tynet.us:8000
+  tynet-cloud-init-probe --check pi2.tynet.us kickstart.tynet.us:8000
 EOF
 }
 

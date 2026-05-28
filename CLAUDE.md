@@ -14,16 +14,16 @@ ds=nocloud;s=http://<kickstart_ip>:8000/
 
 Note there is no per-node key in the URL — `cmdline.txt` is identical for every
 node. The server determines which node is calling by **reverse-DNS-resolving
-the request's source IP**, taking the first label of the PTR result as the
-short hostname (e.g. `pi2.tynet.us.` → `pi2`), and serving
-`<dir>/<short>/{meta-data,user-data,network-config,vendor-data}`. PTR failure
+the request's source IP**, taking the PTR result as the FQDN (trailing dot
+stripped, e.g. `pi2.tynet.us.` → `pi2.tynet.us`), and serving
+`<dir>/<fqdn>/{meta-data,user-data,network-config,vendor-data}`. PTR failure
 or no matching directory → 404. Historically the key was the MAC address (e.g.
 `dc-a6-32-8d-f3-ca`), and before that the CPU serial.
 
 Two paths bypass the reverse-DNS lookup:
 
 - `GET /healthcheck` → `200 OK` when `-dir` is statable, `503` otherwise.
-- `GET /node/<hostname>/<file>` → serves `<dir>/<hostname>/<file>` directly.
+- `GET /node/<fqdn>/<file>` → serves `<dir>/<fqdn>/<file>` directly.
   Used by `tynet-cloud-init-probe` so operators can probe any node from any
   host without depending on their own source IP.
 
@@ -68,7 +68,7 @@ isolation when behavior is shared across them:**
   `.deb` into the pool, regenerates signed apt indexes, and pushes
   `gh-pages`.
 - **tynet-infra** — Ansible source of truth. Renders the runtime
-  `<short-hostname>/` seed tree on kickstart from inventory + `keys/*.pub`,
+  `<fqdn>/` seed tree on kickstart from inventory + `keys/*.pub`,
   owns the DHCP/DNS config that gives Pis working PTR records, configures
   the apt source pointing at `tya.github.io/tynet-apt`, and configures
   Ubuntu's native `unattended-upgrades` (scoped to `origin=tynet`, hourly
@@ -92,7 +92,7 @@ follow-up release.
 
 The runtime `cloud-init/` directory is **gitignored** — it only exists on the
 kickstart host, populated by tynet-infra Ansible. Test fixtures live in
-`testdata/cloud-init/` keyed by short hostname (`pi2`, `pi3`, `testnode`) —
+`testdata/cloud-init/` keyed by FQDN (`pi2.tynet.us`, `pi3.tynet.us`, `testnode.vm`) —
 see the directory for the current set. They're the only seed data this repo
 owns. If you change the on-disk layout (filenames, directory shape, response
 semantics), the corresponding Ansible templates in tynet-infra must be
@@ -104,7 +104,7 @@ updated too.
   development. The shipped systemd unit passes `-dir` explicitly via
   `/etc/default/tynet-cloud-init`, so this fallback isn't relied on in production.
 - The handler logs every request (`remoteAddr method path`) plus a follow-up
-  `resolved <ip> -> <short>` (or `reverse lookup failed for <ip>: …`) line;
+  `resolved <ip> -> <fqdn>` (or `reverse lookup failed for <ip>: …`) line;
   preserve both when refactoring — they're the only operational visibility
   into Pi boot attempts.
 - The reverse-DNS lookup function is injected into `newHandler` so tests can
