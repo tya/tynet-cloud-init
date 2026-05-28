@@ -7,20 +7,24 @@ set -eu
 
 usage() {
     cat <<EOF
-Usage: tynet-cloud-init-probe [--check] <mac-or-serial> [host[:port]]
+Usage: tynet-cloud-init-probe [--check] <fqdn> [host[:port]]
 
-Fetches /<key>/{meta-data,user-data,network-config,vendor-data} from the
-tynet-cloud-init HTTP server. Default host is localhost:8000; pass a
-hostname or full URL to probe a different server.
+Fetches /node/<fqdn>/{meta-data,user-data,network-config,vendor-data}
+from the tynet-cloud-init HTTP server. Default host is localhost:8000;
+pass a hostname or full URL to probe a different server.
+
+The /node/ prefix is the server's explicit-override route, used so the
+probe can ask about any node regardless of which IP the request comes
+from (normal cloud-init traffic resolves the node via reverse DNS).
 
 Without --check, prints each response separated by section headers.
 With --check, runs substring assertions on each response and exits
 non-zero if any are missing — suitable for scripts and post-deploy
 smoke tests. The required substrings mirror the Go server's tests.
 
-  tynet-cloud-init-probe dc-a6-32-8d-f3-ca
-  tynet-cloud-init-probe dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
-  tynet-cloud-init-probe --check dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
+  tynet-cloud-init-probe pi2.tynet.us
+  tynet-cloud-init-probe pi2.tynet.us kickstart.tynet.us:8000
+  tynet-cloud-init-probe --check pi2.tynet.us kickstart.tynet.us:8000
 EOF
 }
 
@@ -45,7 +49,7 @@ esac
 if [ "$check_mode" -eq 0 ]; then
     rc=0
     for file in meta-data user-data network-config vendor-data; do
-        url="$host/$key/$file"
+        url="$host/node/$key/$file"
         printf '===== %s =====\n' "$url"
         if ! curl -sS -f "$url"; then
             printf '\n(fetch failed)\n'
@@ -63,7 +67,7 @@ fail=0
 check_present() {
     file=$1
     shift
-    url="$host/$key/$file"
+    url="$host/node/$key/$file"
     body=$(curl -sS -f "$url" 2>/dev/null) || {
         printf 'FAIL %s: fetch failed (HTTP error or unreachable)\n' "$url" >&2
         fail=1

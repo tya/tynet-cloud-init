@@ -9,17 +9,30 @@ cloud-init NoCloud seed data to Raspberry Pi nodes during NFS netboot. Pis fetch
 their seed via `cmdline.txt`:
 
 ```
-ds=nocloud;s=http://<kickstart_ip>:8000/<key>/
+ds=nocloud;s=http://<kickstart_ip>:8000/
 ```
 
-The `<key>` is an opaque path segment matching a directory under `-dir`. In
-production it's the node's MAC (e.g. `dc-a6-32-8d-f3-ca`); historically it was
-the CPU serial. The server doesn't care — it's a thin wrapper around
-`http.FileServer` that adds request logging and a `/healthcheck` endpoint. It
-serves `<dir>/<key>/{meta-data,user-data,network-config,vendor-data}`. Unknown
-keys → 404. `GET /healthcheck` returns `200 OK` when `-dir` is statable and
-`503` otherwise — `/healthcheck` is reserved (a node keyed literally
-`healthcheck` would shadow it).
+Note there is no per-node key in the URL — `cmdline.txt` is identical for every
+node. The server determines which node is calling by **reverse-DNS-resolving
+the request's source IP**, taking the PTR result as the FQDN (trailing dot
+stripped, e.g. `pi2.tynet.us.` → `pi2.tynet.us`), and serving
+`<dir>/<fqdn>/{meta-data,user-data,network-config,vendor-data}`. PTR failure
+or no matching directory → 404. Historically the key was the MAC address (e.g.
+`dc-a6-32-8d-f3-ca`), and before that the CPU serial.
+
+Two paths bypass the reverse-DNS lookup:
+
+- `GET /healthcheck` → `200 OK` when `-dir` is statable, `503` otherwise.
+- `GET /node/<fqdn>/<file>` → serves `<dir>/<fqdn>/<file>` directly.
+  Used by `tynet-cloud-init-probe` so operators can probe any node from any
+  host without depending on their own source IP.
+
+`healthcheck` and `node` are reserved hostnames — a node keyed literally
+`healthcheck` or `node` would shadow these routes.
+
+**Runtime dependency:** reverse DNS for the Pi DHCP range must work on the
+kickstart host. Verify with `dig -x <pi-ip>` before deploying. tynet-infra
+owns DHCP/DNS configuration.
 
 ## Common commands
 
@@ -30,8 +43,8 @@ make deb           # build linux/arm64 .deb into dist/ (requires nfpm: brew inst
 make test          # go test -v . against testdata/cloud-init/
 make clean
 
-go test -run TestServeCloudInit/pi2_user-data_ssh_key   # single subtest
-go run . -dir testdata/cloud-init -addr :8000           # ad-hoc local run
+go test -run TestServeCloudInit/pi2.tynet.us_user-data_ssh_key   # single subtest
+go run . -dir testdata/cloud-init -addr :8000                    # ad-hoc local run
 ```
 
 `make deb` derives `VERSION` from `git describe` (falling back to `0.0.0~dev`
@@ -54,14 +67,16 @@ isolation when behavior is shared across them:**
   `repository_dispatch` (fired by this repo's release workflow), drops the
   `.deb` into the pool, regenerates signed apt indexes, and pushes
   `gh-pages`.
-- **tynet-infra** — Ansible source of truth. Renders the runtime `<key>/`
-  seed tree on kickstart from inventory + `keys/*.pub`, configures the apt
-  source pointing at `tya.github.io/tynet-apt`, and configures Ubuntu's
-  native `unattended-upgrades` (scoped to `origin=tynet`, hourly cadence)
-  to install/upgrade tynet packages. Configures the service via
+- **tynet-infra** — Ansible source of truth. Renders the runtime
+  `<fqdn>/` seed tree on kickstart from inventory + `keys/*.pub`,
+  owns the DHCP/DNS config that gives Pis working PTR records, configures
+  the apt source pointing at `tya.github.io/tynet-apt`, and configures
+  Ubuntu's native `unattended-upgrades` (scoped to `origin=tynet`, hourly
+  cadence) to install/upgrade tynet packages. Configures the service via
   `/etc/default/tynet-cloud-init`.
-- **tynet-img** — builds the Pi netboot image and provisions per-node TFTP
-  (including the `cmdline.txt` that points here).
+- **tynet-img** — builds the Pi netboot image and provisions TFTP. Since
+  the `cmdline.txt` carries no per-node key anymore, the same image/cmdline
+  is used for every Pi.
 
 **Release flow is fully autonomous for the steady state.** `git push origin
 v0.X.Y` → release workflow publishes the `.deb` and dispatches into
@@ -77,19 +92,23 @@ follow-up release.
 
 The runtime `cloud-init/` directory is **gitignored** — it only exists on the
 kickstart host, populated by tynet-infra Ansible. Test fixtures live in
-`testdata/cloud-init/` keyed by MAC (e.g. `dc-a6-32-8d-f3-ca`,
-`dc-a6-32-80-2a-cc`, `52-55-55-60-97-49`) — see the directory for the
-current set. They're the only seed data this repo owns. If you change the
-on-disk layout (filenames, directory shape, response semantics), the
-corresponding Ansible templates in tynet-infra must be updated too.
+`testdata/cloud-init/` keyed by FQDN (`pi2.tynet.us`, `pi3.tynet.us`, `testnode.vm`) —
+see the directory for the current set. They're the only seed data this repo
+owns. If you change the on-disk layout (filenames, directory shape, response
+semantics), the corresponding Ansible templates in tynet-infra must be
+updated too.
 
 ## Conventions worth knowing
 
 - `defaultDir()` resolves to `<exe_dir>/cloud-init`, not CWD — convenient for
   development. The shipped systemd unit passes `-dir` explicitly via
   `/etc/default/tynet-cloud-init`, so this fallback isn't relied on in production.
-- The handler logs every request (`remoteAddr method path`); preserve this when
-  refactoring — it's the only operational visibility into Pi boot attempts.
+- The handler logs every request (`remoteAddr method path`) plus a follow-up
+  `resolved <ip> -> <fqdn>` (or `reverse lookup failed for <ip>: …`) line;
+  preserve both when refactoring — they're the only operational visibility
+  into Pi boot attempts.
+- The reverse-DNS lookup function is injected into `newHandler` so tests can
+  stub it; production wires in `net.LookupAddr`. Keep it injectable.
 - Tests assert on **substring presence** in response bodies (`#cloud-config`,
   `instance-id:`, `ssh-ed25519 `) rather than exact content, so fixtures can
   evolve without churning tests. Follow that pattern for new assertions.
