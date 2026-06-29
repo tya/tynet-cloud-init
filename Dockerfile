@@ -11,6 +11,9 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags='-s -w' -o /out/tynet-cloud-init .
 
 FROM gcr.io/distroless/static-debian12:nonroot
+# Links the GHCR package to this repo (provenance + inherits repo on the
+# package page). Visibility is still managed separately.
+LABEL org.opencontainers.image.source="https://github.com/tya/tynet-cloud-init"
 COPY --from=build /out/tynet-cloud-init /usr/local/bin/tynet-cloud-init
 EXPOSE 8443
 ENTRYPOINT ["/usr/local/bin/tynet-cloud-init"]
