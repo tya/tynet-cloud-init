@@ -92,10 +92,17 @@ func defaultDir() string {
 func main() {
 	dir := flag.String("dir", defaultDir(), "directory containing per-node seed data")
 	addr := flag.String("addr", ":8000", "address to listen on")
+	tlsCert := flag.String("tls-cert", "", "path to TLS cert (PEM); HTTPS enabled when set with -tls-key")
+	tlsKey := flag.String("tls-key", "", "path to TLS key (PEM)")
 	flag.Parse()
 
 	// journald already timestamps each line; drop Go's prefix to avoid duplicates.
 	log.SetFlags(0)
+	handler := newHandler(*dir, net.LookupAddr)
+	if *tlsCert != "" && *tlsKey != "" {
+		log.Printf("serving %s on %s (https)", *dir, *addr)
+		log.Fatal(http.ListenAndServeTLS(*addr, *tlsCert, *tlsKey, handler))
+	}
 	log.Printf("serving %s on %s", *dir, *addr)
-	log.Fatal(http.ListenAndServe(*addr, newHandler(*dir, net.LookupAddr)))
+	log.Fatal(http.ListenAndServe(*addr, handler))
 }
