@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tynet-cloud-init
+  labels:
+    app: tynet-cloud-init
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tynet-cloud-init
+  strategy:
+    # hostPath + nodeSelector means only one pod can run at a time — the
+    # rolling-update default would deadlock waiting for the new replica to
+    # come up.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: tynet-cloud-init
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: {{ .Values.nodeName }}
+      containers:
+        - name: tynet-cloud-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "-dir=/var/lib/tynet-cloud-init"
+            - "-addr=:8443"
+            - "-tls-cert=/etc/tls/tls.crt"
+            - "-tls-key=/etc/tls/tls.key"
+          ports:
+            - name: https
+              containerPort: 8443
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: https
+              scheme: HTTPS
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: https
+              scheme: HTTPS
+            periodSeconds: 15
+          volumeMounts:
+            - name: seed-data
+              mountPath: /var/lib/tynet-cloud-init
+              readOnly: true
+            - name: tls
+              mountPath: /etc/tls
+              readOnly: true
+      volumes:
+        - name: seed-data
+          hostPath:
+            path: {{ .Values.seedData.hostPath }}
+            type: Directory
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}

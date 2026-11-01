@@ -1,0 +1,26 @@
+# LoadBalancer (MetalLB), same convention as argocd-server and meal-planner:
+# no ingress controller in this cluster, so this gets its own external IP
+# and terminates TLS itself inside the pod. The A record
+# (cloud-init.tynet.us -> this IP) is added by hand in UniFi.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tynet-cloud-init
+  labels:
+    app: tynet-cloud-init
+  annotations:
+    # Pin the MetalLB-assigned IP. Modern MetalLB (CRD-based, microk8s 1.32)
+    # uses this annotation in place of the deprecated Service.loadBalancerIP.
+    metallb.universe.tf/loadBalancerIPs: {{ .Values.service.loadBalancerIP }}
+spec:
+  type: LoadBalancer
+  # Preserves the Pi's real source IP so the handler's reverse-DNS lookup
+  # still works (main.go derives the FQDN from r.RemoteAddr).
+  externalTrafficPolicy: Local
+  selector:
+    app: tynet-cloud-init
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+      protocol: TCP

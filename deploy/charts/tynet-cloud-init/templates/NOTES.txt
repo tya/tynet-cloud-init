@@ -1,0 +1,15 @@
+tynet-cloud-init installed in {{ .Release.Namespace }}.
+
+Watch it come up:
+
+  microk8s kubectl -n {{ .Release.Namespace }} get pod,svc,certificate
+
+Smoke test (bypasses DNS, resolves straight to the MetalLB VIP):
+
+  curl -sS --resolve cloud-init.tynet.us:443:{{ .Values.service.loadBalancerIP }} \
+    https://cloud-init.tynet.us/healthcheck
+
+Cert rotation does not hot-reload — main.go loads tls.crt/tls.key once at
+startup. After a renewal, restart to pick it up:
+
+  microk8s kubectl -n {{ .Release.Namespace }} rollout restart deployment/tynet-cloud-init

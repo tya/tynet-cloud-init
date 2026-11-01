@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tynet-us-wildcard
+  labels:
+    app: tynet-cloud-init
+spec:
+  # cert-manager creates/updates this Secret with tls.crt + tls.key on
+  # issuance and renewal. The Deployment mounts the same Secret name.
+  secretName: {{ .Values.tls.secretName }}
+  duration: 2160h    # 90d  (Let's Encrypt max)
+  renewBefore: 720h  # 30d  (cert-manager rotates with this much life left)
+  issuerRef:
+    name: {{ .Values.tls.issuerName }}
+    kind: ClusterIssuer
+  dnsNames:
+    - tynet.us
+    - "*.tynet.us"

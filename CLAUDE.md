@@ -77,15 +77,18 @@ isolation when behavior is shared across them:**
   Distributed as a container image at `ghcr.io/tya/tynet-cloud-init`
   (production) and as a `.deb` on GitHub Releases (for ad-hoc / fallback
   installs).
-- **tynet-infra** — Ansible source of truth. The `cloud_init_cluster` role
-  renders the workload manifests on kickstart, syncs the wildcard `*.tynet.us`
-  cert from `vpn.tynet.us` into a `kubernetes.io/tls` Secret, and applies
-  Namespace / Secret / Deployment / Service via `microk8s kubectl`. The
-  Deployment is pinned to the kickstart node (`nodeSelector`) and hostPath-
-  mounts the seed tree the `kickstart` role keeps rendering at
-  `/var/lib/tynet-cloud-init/<fqdn>/`. Owns the UniFi DHCP/DNS that gives
-  Pis working PTR records (essential) plus the `cloud-init.tynet.us` A record
-  pointing at the MetalLB VIP (`10.0.60.60`, manual UniFi step).
+- **tynet-infra** — Ansible source of truth, but no longer the thing that
+  deploys this workload. ArgoCD (running in-cluster, installed by
+  tynet-infra's `argocd` role) owns the Namespace/Service/Deployment/
+  Certificate via `gitops/cloud-init/application.yaml`, which points at the
+  Helm chart in *this* repo (`deploy/charts/tynet-cloud-init` — see
+  "Kubernetes deployment" below). tynet-infra's own `cloud_init_cluster` role
+  now only smoke-tests what Argo synced. tynet-infra still owns the `kickstart`
+  role, which renders the per-node seed tree at
+  `/var/lib/tynet-cloud-init/<fqdn>/` (hostPath-mounted into the pod by the
+  chart's Deployment), and the UniFi DHCP/DNS that gives Pis working PTR
+  records (essential) plus the `cloud-init.tynet.us` A record pointing at the
+  MetalLB VIP (`10.0.60.60`, manual UniFi step).
 - **tya/tynet-apt** — GH-Pages-served apt repo at
   `https://tya.github.io/tynet-apt`. Still receives `.deb` uploads on tag push
   via `repository_dispatch`, but the in-cluster deployment doesn't consume
@@ -96,12 +99,13 @@ isolation when behavior is shared across them:**
 
 **Release flow.** `git push origin v0.X.Y` → `.github/workflows/image.yml`
 builds the container image and pushes `:v0.X.Y` and `:latest` to ghcr.io
-(in parallel, `release.yml` still ships the `.deb`). Picking up the new image
-requires either (a) `microk8s kubectl rollout restart -n cloud-init
-deployment/tynet-cloud-init` to re-pull `:latest`, or (b) bumping
-`cloud_init_image_tag` in `roles/cloud_init_cluster/defaults/main.yml` and
-re-running `make cloud-init-cluster`. There is no auto-rollout — broken
-releases stay deployed until rolled back manually.
+(in parallel, `release.yml` still ships the `.deb`). The cluster deployment
+pins a real tag (not `:latest`) in `deploy/charts/tynet-cloud-init/values.yaml`
+— bump `image.tag` there, commit, and `argocd app sync cloud-init` (or let
+Argo's own UI/CLI report it out-of-sync first and sync by hand; this
+Application has no automated sync yet). There is no auto-rollout — broken
+releases stay deployed until rolled back manually by bumping the tag back
+and syncing again.
 
 The runtime `cloud-init/` directory is **gitignored** — it only exists on the
 kickstart host, populated by tynet-infra Ansible. Test fixtures live in
@@ -132,15 +136,23 @@ updated too.
 
 ## Packaging layout
 
-Two parallel distribution channels:
+Two parallel distribution channels, plus the chart that deploys the image one:
 
 - **Container image** (production) — built by `.github/workflows/image.yml`
   from the repo-root `Dockerfile`. Multi-stage golang→distroless/static,
-  runs as nonroot UID 65532. The in-cluster Deployment in tynet-infra's
-  `cloud_init_cluster` role pulls from `ghcr.io/tya/tynet-cloud-init`.
+  runs as nonroot UID 65532. `ghcr.io/tya/tynet-cloud-init`.
 - **`.deb` package** (ad-hoc) — built by `.github/workflows/release.yml`
   using nfpm. Still useful for direct-on-host installs and for the
   apt-repo pipeline, but the production cluster no longer consumes it.
+
+**Kubernetes deployment** — `deploy/charts/tynet-cloud-init/` is the Helm
+chart ArgoCD renders (source for tynet-infra's `gitops/cloud-init/
+application.yaml`). It owns the Namespace/Service/Deployment/Certificate
+that used to be Jinja-templated Ansible manifests in tynet-infra's
+`cloud_init_cluster` role — image tag, LoadBalancer IP, kickstart node name,
+and cert issuer now live in this chart's `values.yaml`, not Ansible defaults.
+`helm template deploy/charts/tynet-cloud-init` renders it locally for
+review; `helm lint` catches structural mistakes before a PR.
 
 `packaging/` holds everything the `.deb` ships:
 

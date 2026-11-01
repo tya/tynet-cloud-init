@@ -1,0 +1,8 @@
+apiVersion: v2
+name: tynet-cloud-init
+description: Serves per-node cloud-init NoCloud seed data to Raspberry Pi nodes during NFS netboot
+type: application
+version: 0.1.0
+appVersion: "0.7.0"
+keywords: [cloud-init, nocloud, netboot, raspberry-pi]
+home: https://github.com/tya/tynet-cloud-init
