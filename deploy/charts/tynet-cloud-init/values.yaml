@@ -1,0 +1,37 @@
+# Single pod, hostPath-pinned to the kickstart host — it's the one node
+# with the per-FQDN seed tree (tynet-infra's kickstart role seed-data tasks
+# render it there; this chart doesn't own its contents). Recreate rather
+# than RollingUpdate because hostPath + nodeSelector means only one pod can
+# run at a time regardless.
+
+image:
+  repository: ghcr.io/tya/tynet-cloud-init
+  # Bump on release (matches the `v*` git tag pushed to ghcr.io by
+  # .github/workflows/image.yml), commit, let Argo pick it up.
+  tag: v0.7.0
+  pullPolicy: IfNotPresent
+
+seedData:
+  # Per-node seed tree on the kickstart host, bind-mounted read-only.
+  hostPath: /var/lib/tynet-cloud-init
+
+# microk8s node label (short hostname, not FQDN) of whichever host currently
+# holds the [kickstart] role in tynet-infra's inventory. Unlike the Ansible
+# template this replaces, this is NOT auto-derived from that inventory —
+# bump it by hand here if the kickstart host ever moves.
+nodeName: pi1
+
+service:
+  # LoadBalancer (MetalLB), same convention as argocd-server and
+  # meal-planner's status page: no ingress controller in this cluster, so
+  # this gets its own external IP and terminates TLS itself in the pod. The
+  # A record (cloud-init.tynet.us -> this IP) is added by hand in UniFi.
+  loadBalancerIP: 10.0.60.60
+
+tls:
+  # cert-manager writes tls.crt/tls.key into this Secret on issuance and
+  # every renewal; the Deployment mounts it by name. main.go loads it once
+  # at startup (ListenAndServeTLS) and does not hot-reload, so a renewal
+  # needs a pod restart — currently manual, see repo README.
+  secretName: cloud-init-tls
+  issuerName: letsencrypt-cloudflare
