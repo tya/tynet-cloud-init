@@ -71,6 +71,14 @@ func TestNodeOverrideRoute(t *testing.T) {
 	assertGet(t, server.URL+"/node/pi2.tynet.us/meta-data", http.StatusOK, "local-hostname:")
 }
 
+func TestDirectoryListingBlocked(t *testing.T) {
+	// A request that resolves to a directory (not a file) must 404, not
+	// hand off to http.FileServer's default directory-listing behavior.
+	server := newTestServer(t, stubLookup("pi2.tynet.us"))
+	assertGet(t, server.URL+"/", http.StatusNotFound, "")
+	assertGet(t, server.URL+"/node/pi2.tynet.us/", http.StatusNotFound, "")
+}
+
 func TestHealthcheckOK(t *testing.T) {
 	server := newTestServer(t, stubLookup("nosuchhost.example"))
 	assertGet(t, server.URL+"/healthcheck", http.StatusOK, "ok")

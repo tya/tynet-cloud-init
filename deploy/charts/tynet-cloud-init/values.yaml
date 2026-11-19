@@ -35,3 +35,10 @@ tls:
   # needs a pod restart — currently manual, see repo README.
   secretName: cloud-init-tls
   issuerName: letsencrypt-cloudflare
+
+# A static file server for a handful of small per-node text files — this
+# ceiling is deliberately tight, and mostly here so a leak or runaway
+# doesn't compete with microk8s's own system pods on a Pi.
+resources:
+  requests: { cpu: 10m, memory: 32Mi }
+  limits: { cpu: 200m, memory: 64Mi }

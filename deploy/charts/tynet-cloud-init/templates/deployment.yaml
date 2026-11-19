@@ -21,10 +21,24 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/hostname: {{ .Values.nodeName }}
+      securityContext:
+        # Doesn't rely on the distroless nonroot image's own default UID —
+        # enforced here too, so the pod is refused outright if that image
+        # default ever changes, rather than silently trusting it.
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: tynet-cloud-init
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
           args:
             - "-dir=/var/lib/tynet-cloud-init"
             - "-addr=:8443"
