@@ -37,7 +37,21 @@ import (
 func newHandler(dir string, lookup func(string) ([]string, error)) http.Handler {
 	// http.Dir protects against ../ traversal, so it's safe to rewrite
 	// r.URL.Path below and hand the cloned request to fs.
-	fs := http.FileServer(http.Dir(dir))
+	hd := http.Dir(dir)
+	fs := http.FileServer(hd)
+	serve := func(w http.ResponseWriter, r *http.Request) {
+		// http.FileServer lists directory contents when no index file is
+		// present — the per-node file set is fixed and already predictable,
+		// but there's no reason to confirm it either. isDir reuses hd's own
+		// Open (not a hand-rolled path join) so this gets the exact same
+		// ../ protection as the real serve, instead of risking a second,
+		// slightly different traversal check.
+		if isDir(hd, r.URL.Path) {
+			http.NotFound(w, r)
+			return
+		}
+		fs.ServeHTTP(w, r)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL.Path)
 
@@ -55,7 +69,7 @@ func newHandler(dir string, lookup func(string) ([]string, error)) http.Handler 
 		if strings.HasPrefix(r.URL.Path, "/node/") {
 			r2 := r.Clone(r.Context())
 			r2.URL.Path = strings.TrimPrefix(r.URL.Path, "/node")
-			fs.ServeHTTP(w, r2)
+			serve(w, r2)
 			return
 		}
 
@@ -77,8 +91,19 @@ func newHandler(dir string, lookup func(string) ([]string, error)) http.Handler 
 		log.Printf("resolved %s -> %s", ip, fqdn)
 		r2 := r.Clone(r.Context())
 		r2.URL.Path = "/" + fqdn + r.URL.Path
-		fs.ServeHTTP(w, r2)
+		serve(w, r2)
 	})
+}
+
+// isDir reports whether path resolves to a directory within hd.
+func isDir(hd http.Dir, path string) bool {
+	f, err := hd.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	return err == nil && fi.IsDir()
 }
 
 func defaultDir() string {
