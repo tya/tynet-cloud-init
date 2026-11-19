@@ -32,7 +32,7 @@ contents:
     file_info:
       mode: 0755
   - src: ./packaging/tynet-cloud-init.service
-    dst: /lib/systemd/system/tynet-cloud-init.service
+    dst: /usr/lib/systemd/system/tynet-cloud-init.service
     file_info:
       mode: 0644
   - src: ./packaging/tynet-cloud-init.default
