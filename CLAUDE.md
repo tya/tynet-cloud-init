@@ -101,11 +101,18 @@ isolation when behavior is shared across them:**
 builds the container image and pushes `:v0.X.Y` and `:latest` to ghcr.io
 (in parallel, `release.yml` still ships the `.deb`). The cluster deployment
 pins a real tag (not `:latest`) in `deploy/charts/tynet-cloud-init/values.yaml`
-— bump `image.tag` there, commit, and `argocd app sync cloud-init` (or let
-Argo's own UI/CLI report it out-of-sync first and sync by hand; this
-Application has no automated sync yet). There is no auto-rollout — broken
-releases stay deployed until rolled back manually by bumping the tag back
-and syncing again.
+— bump `image.tag` there and merge to `main`. The Argo Application tracks
+`main` with **automated sync + prune**, so the merge *is* the deploy: Argo
+picks it up within its polling interval (Argo default ~3 min) with no manual
+`argocd app sync`. That applies to every change under the chart, so treat
+chart PRs as production deploys. There is no automated rollback — a broken
+release stays deployed until the tag bump is reverted and merged.
+
+To verify a rollout, `ssh pi1.tynet.us` (the kickstart host) and use
+`sudo microk8s kubectl` — there's no local kubeconfig. For example,
+`sudo microk8s kubectl -n argocd get application cloud-init` and
+`sudo microk8s kubectl -n cloud-init get deploy -o wide`. Then curl
+`https://cloud-init.tynet.us/healthcheck`.
 
 The runtime `cloud-init/` directory is **gitignored** — it only exists on the
 kickstart host, populated by tynet-infra Ansible. Test fixtures live in

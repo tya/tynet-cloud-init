@@ -2,21 +2,32 @@
 
 HTTP server for per-node cloud-init seed data on tynet.us infrastructure.
 
-Serves files from `<dir>/<key>/{meta-data,user-data,network-config,vendor-data}`,
-where `<key>` is whatever path segment names a Pi's seed directory. In
-production it's the node's MAC (e.g. `dc-a6-32-8d-f3-ca`); historically
-it was the CPU serial. The server doesn't care — anything matching a
-directory under `-dir` works. Pi nodes booting via NFS netboot fetch their
-seed data via `cmdline.txt`:
+Serves files from `<dir>/<fqdn>/{meta-data,user-data,network-config,vendor-data}`.
+The node is identified by **reverse-DNS-resolving the request's source IP**:
+the PTR result (trailing dot stripped, e.g. `pi2.tynet.us`) names the seed
+directory. PTR failure or no matching directory → 404. Historically the key
+was the MAC address, and before that the CPU serial.
+
+Pi nodes booting via NFS netboot fetch their seed data via `cmdline.txt`,
+which is identical for every node:
 
 ```
-ds=nocloud;s=http://<kickstart_ip>:8000/<key>/
+ds=nocloud;s=https://cloud-init.tynet.us/
 ```
 
-Also exposes `GET /healthcheck`: returns `200 OK` (`ok\n`) when `-dir` is
-statable, `503 Service Unavailable` when the directory is missing or
-unreadable. The path `/healthcheck` is reserved — a node keyed literally
-`healthcheck` would shadow this endpoint.
+Two routes bypass the reverse-DNS lookup:
+
+- `GET /healthcheck` → `200 OK` (`ok\n`) when `-dir` is statable,
+  `503 Service Unavailable` when it's missing or unreadable.
+- `GET /node/<fqdn>/<file>` → serves `<dir>/<fqdn>/<file>` directly, so
+  any node can be probed from any host.
+
+`healthcheck` and `node` are reserved — a node with either name would
+shadow these routes.
+
+TLS is terminated in the binary when both `-tls-cert` and `-tls-key` are
+set (plain HTTP otherwise). The cert is loaded once at startup; rotation
+needs a restart.
 
 ## Build & test
 
@@ -24,6 +35,7 @@ unreadable. The path `/healthcheck` is reserved — a node keyed literally
 make build         # local
 make build-linux   # cross-compile for kickstart host (linux/arm64)
 make deb           # build linux/arm64 .deb into dist/ (requires nfpm)
+make image         # build linux/arm64 container image (requires Docker buildx)
 make test          # uses testdata/cloud-init/
 ```
 
@@ -48,11 +60,11 @@ go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
 
 ## Per-node seed data
 
-Seed files live in `<dir>/<key>/` at runtime — **rendered by
+Seed files live in `<dir>/<fqdn>/` at runtime — **rendered by
 [tynet-infra](https://github.com/tya/tynet-infra) Ansible** from
 inventory and `keys/*.pub`. Fixtures used by `go test` are in
-`testdata/cloud-init/` (currently MAC-keyed: `dc-a6-32-8d-f3-ca`,
-`dc-a6-32-80-2a-cc`, `52-55-55-60-97-49`).
+`testdata/cloud-init/`, keyed by FQDN (`pi2.tynet.us`, `pi3.tynet.us`,
+`testnode.vm`).
 
 ## Releasing
 
@@ -63,21 +75,44 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-`.github/workflows/release.yml` runs on tag push, builds the arm64 `.deb`,
-publishes it to a GitHub Release, and dispatches `new-release` into
-[tya/tynet-apt](https://github.com/tya/tynet-apt). That repo's `ingest`
-workflow drops the deb into its pool, regenerates the signed apt indexes,
-and pushes to `gh-pages` — the GH-Pages-served apt repo at
-`https://tya.github.io/tynet-apt`. On kickstart, the OS's native
-`unattended-upgrades` (configured by tynet-infra, scoped to `origin=tynet`)
-runs hourly, sees the new candidate, and `apt-get install`s it. End-to-end:
-healthy tag goes live within ≤1 hour; nothing on the kickstart side needs
-a manual bump.
+Two workflows run in parallel on tag push:
+
+- `.github/workflows/image.yml` builds the linux/arm64 container image and
+  pushes `:v0.X.Y` and `:latest` to `ghcr.io/tya/tynet-cloud-init`.
+- `.github/workflows/release.yml` builds the arm64 `.deb`, publishes it to a
+  GitHub Release, and dispatches `new-release` into
+  [tya/tynet-apt](https://github.com/tya/tynet-apt) (the GH-Pages-served apt
+  repo at `https://tya.github.io/tynet-apt`). The production cluster doesn't
+  consume the `.deb`; it's kept for ad-hoc installs.
+
+A tag push alone does not deploy anything — see below.
 
 ## Deployment
 
-Distributed as a Debian package (`tynet-cloud-init`) installed via apt by
-the kickstart Ansible role in [tynet-infra](https://github.com/tya/tynet-infra).
+Production runs as a single pod in the microk8s cluster on kickstart,
+deployed by ArgoCD from the Helm chart in
+[`deploy/charts/tynet-cloud-init`](deploy/charts/tynet-cloud-init). The
+Argo Application lives in tynet-infra (`gitops/cloud-init/application.yaml`)
+and tracks this repo's `main` branch with **automated sync and prune**.
+
+The chart pins a real image tag (not `:latest`). To roll out a release,
+bump `image.tag` in `deploy/charts/tynet-cloud-init/values.yaml` and merge
+to `main` — Argo syncs it within its polling interval (Argo default ≈3 min), no manual
+`argocd app sync` needed. Anything else merged under the chart deploys the
+same way, so treat chart PRs as deploys. Roll back by reverting the bump
+and merging; there's no automated rollback.
+
+The Service is `type: LoadBalancer` on MetalLB VIP `10.0.60.60` with
+`externalTrafficPolicy: Local` (preserving the Pi's source IP for the
+reverse-DNS lookup), port 443 → container 8443. The per-node seed tree at
+`/var/lib/tynet-cloud-init` on kickstart is hostPath-mounted into the pod;
+tynet-infra's `kickstart` role renders it.
+
+`helm template deploy/charts/tynet-cloud-init` renders the chart locally;
+`helm lint` catches structural mistakes before a PR.
+
+### `.deb` (ad-hoc installs)
+
 The package ships a systemd unit that runs as the `tynet-cloud-init` system
 user and reads runtime options from `/etc/default/tynet-cloud-init`:
 
@@ -85,29 +120,28 @@ user and reads runtime options from `/etc/default/tynet-cloud-init`:
 OPTIONS="-dir /var/lib/tynet-cloud-init -addr :8000"
 ```
 
-Ansible templates that file to point `-dir` at the rendered seed-data tree.
-
 The .deb also installs `/usr/bin/tynet-cloud-init-probe`, a small POSIX
-shell tool that fetches all four cloud-init files for a given key —
+shell tool that fetches all four cloud-init files for a node (via the
+`/node/<fqdn>/` route) —
 useful for verifying a node's seed data is being served correctly
 without booting the node:
 
 ```sh
-tynet-cloud-init-probe dc-a6-32-8d-f3-ca                             # default: localhost:8000
-tynet-cloud-init-probe dc-a6-32-8d-f3-ca kickstart.tynet.us:8000     # explicit host
+tynet-cloud-init-probe pi2.tynet.us                                   # default: localhost:8000
+tynet-cloud-init-probe pi2.tynet.us https://cloud-init.tynet.us       # production
 ```
 
 Pass `--check` for a smoke-test mode that asserts each response is
 present and contains the same substrings the Go server's tests check
 for (`#cloud-config`, `instance-id:`, `ssh-ed25519 `, etc.). Prints
-`ok: <key> via <host>` and exits 0 on success; prints per-failure
+`ok: <fqdn> via <host>` and exits 0 on success; prints per-failure
 diagnostics to stderr and exits 1 on any miss:
 
 ```sh
-tynet-cloud-init-probe --check dc-a6-32-8d-f3-ca kickstart.tynet.us:8000
+tynet-cloud-init-probe --check pi2.tynet.us https://cloud-init.tynet.us
 ```
 
 ## Related
 
 - [tynet-img](https://github.com/tya/tynet-img) — Pi netboot image build + per-node TFTP provisioning
-- [tynet-infra](https://github.com/tya/tynet-infra) — Ansible source of truth for node identity, deploys this service
+- [tynet-infra](https://github.com/tya/tynet-infra) — Ansible source of truth for node identity and DNS; renders the seed tree and owns the ArgoCD Application that deploys this chart
