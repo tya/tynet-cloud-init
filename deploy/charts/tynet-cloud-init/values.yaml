@@ -8,7 +8,7 @@ image:
   repository: ghcr.io/tya/tynet-cloud-init
   # Bump on release (matches the `v*` git tag pushed to ghcr.io by
   # .github/workflows/image.yml), commit, let Argo pick it up.
-  tag: v0.8.0
+  tag: v0.8.1
   pullPolicy: IfNotPresent
 
 seedData:
