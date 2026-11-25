@@ -26,7 +26,12 @@ service:
   # meal-planner's status page: no ingress controller in this cluster, so
   # this gets its own external IP and terminates TLS itself in the pod. The
   # A record (cloud-init.tynet.us -> this IP) is added by hand in UniFi.
-  loadBalancerIP: 10.0.60.60
+  # On the services VLAN's pool; tynet-infra's gitops/cloud-init
+  # Application also pins it there via Helm values.
+  loadBalancerIP: 10.0.120.4
+  # No NodePort alongside the VIP. MetalLB L2 delivers straight to the pod,
+  # so a NodePort would only be an extra way in on every node address.
+  allocateNodePorts: false
 
 tls:
   # cert-manager writes tls.crt/tls.key into this Secret on issuance and
